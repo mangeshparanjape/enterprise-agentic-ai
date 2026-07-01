@@ -1,32 +1,26 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Google;
 using Microsoft.SemanticKernel.Connectors.Ollama;
-
-IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
 #pragma warning disable SKEXP0070
 
-kernelBuilder.AddOllamaChatCompletion(
-    modelId: "llama3.2",
-    endpoint: new Uri("http://localhost:11434")
-);
-kernelBuilder.Services.AddSingleton<IAiProvider, OllamaProvider>();
-#pragma warning restore SKEXP0070
+IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
+IAiProvider provider =new OllamaProvider();
+provider.Configure(kernelBuilder);
+kernelBuilder.Services.AddSingleton(provider);
+
 
 kernelBuilder.Services.AddLogging(services => services.AddConsole().SetMinimumLevel(LogLevel.Warning));
+kernelBuilder.Services.AddSingleton<IAlertService, MockAlertService>();
 kernelBuilder.Plugins.AddFromType<AzureAlertPlugin>("azure_alerts");
 
 Kernel kernel = kernelBuilder.Build();
 var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
 
-kernel.Plugins.AddFromType<LightsPlugin>("Lights");
-
 var history = new ChatHistory();
-var aiProvider = kernel.GetRequiredService<IAiProvider>();
-var executionSettings = aiProvider.CreateExecutionSettings();
-
+var executionSettings =
+    provider.CreateExecutionSettings();
 while (true)
 {
     Console.Write("User > ");
