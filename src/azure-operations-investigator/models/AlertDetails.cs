@@ -10,3 +10,7 @@ public sealed record AlertDetails(
 public sealed record AlertSafety(
     string AccessLevel,
     bool DestructiveAction);
+public sealed record AlertSummary(
+    string AlertId,
+    string Severity,
+    string Resource);

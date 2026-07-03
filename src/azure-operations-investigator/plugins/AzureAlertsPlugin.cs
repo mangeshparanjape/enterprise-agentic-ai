@@ -18,4 +18,10 @@ public sealed class AzureAlertPlugin
     {
         return _alertService.GetAlertDetailsAsync(alertId);
     }
+    [KernelFunction]
+    [Description("Gets a list of active Azure alerts.")]
+    public Task<IReadOnlyList<AlertSummary>> GetActiveAlertsAsync()
+    {
+        return _alertService.GetActiveAlertsAsync();
+    }
 }
