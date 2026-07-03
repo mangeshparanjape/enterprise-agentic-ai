@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-
+using Microsoft.SemanticKernel.Connectors.Ollama;
 namespace EnterpriseAiPortfolio.Ai;
 
 #pragma warning disable SKEXP0070
@@ -45,8 +45,14 @@ public sealed class OllamaProvider : IAiProvider
 
         chatHistory.AddUserMessage(request.UserMessage);
 
+        var executionSettings = new OllamaPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        };
+
         var response = await chatCompletionService.GetChatMessageContentAsync(
             chatHistory,
+            executionSettings,
             kernel: kernel,
             cancellationToken: cancellationToken);
 

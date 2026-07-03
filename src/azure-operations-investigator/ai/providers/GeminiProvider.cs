@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.Google;
 
 namespace EnterpriseAiPortfolio.Ai;
 
@@ -44,9 +45,13 @@ public sealed class GeminiProvider : IAiProvider
         }
 
         chatHistory.AddUserMessage(request.UserMessage);
-
+        var executionSettings = new GeminiPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        };
         var response = await chatCompletionService.GetChatMessageContentAsync(
             chatHistory,
+            executionSettings,
             kernel: kernel,
             cancellationToken: cancellationToken);
 
