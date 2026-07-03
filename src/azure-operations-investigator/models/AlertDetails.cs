@@ -6,11 +6,3 @@ public sealed record AlertDetails(
     string Signal,
     IReadOnlyList<string> NextSteps,
     AlertSafety Safety);
-
-public sealed record AlertSafety(
-    string AccessLevel,
-    bool DestructiveAction);
-public sealed record AlertSummary(
-    string AlertId,
-    string Severity,
-    string Resource);

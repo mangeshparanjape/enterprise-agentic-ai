@@ -1,40 +1,49 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 
 #pragma warning disable SKEXP0070
 
-var configuration = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json", optional: false)
-    .AddEnvironmentVariables()
-    .Build();
+var builder = Host.CreateApplicationBuilder(args);
 
-IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
-kernelBuilder.Services.AddLogging(services =>
-    services.AddConsole().SetMinimumLevel(LogLevel.Warning));
+// App services
+builder.Services.AddSingleton<IAlertService, MockAlertService>();
 
-kernelBuilder.Services.AddSingleton<IAlertService, MockAlertService>();
+// AI provider
+builder.Services.AddSingleton<IAiProvider>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    return AiProviderFactory.Create(configuration);
+});
 
-IAiProvider aiProvider = AiProviderFactory.Create(configuration);
+// Build Kernel through DI
+builder.Services.AddSingleton<Kernel>(sp =>
+{
+    var kernelBuilder = Kernel.CreateBuilder();
 
-aiProvider.Configure(kernelBuilder);
+    var aiProvider = sp.GetRequiredService<IAiProvider>();
 
-kernelBuilder.Services.AddSingleton(aiProvider);
+    aiProvider.Configure(kernelBuilder);
 
-kernelBuilder.Plugins.AddFromType<AzureAlertPlugin>("azure_alerts");
+    kernelBuilder.Services.AddSingleton(sp.GetRequiredService<IAlertService>());
 
-Kernel kernel = kernelBuilder.Build();
+    kernelBuilder.Plugins.AddFromType<AzureAlertPlugin>("azure_alerts");
 
-var chatCompletionService =
-    kernel.GetRequiredService<IChatCompletionService>();
+    return kernelBuilder.Build();
+});
 
-var executionSettings =
-    aiProvider.CreateExecutionSettings();
+// Agent
+builder.Services.AddSingleton<IOperationsAgent, OperationsAgent>();
 
-var history = new ChatHistory();
+using var host = builder.Build();
+
+var agent = host.Services.GetRequiredService<IOperationsAgent>();
 
 while (true)
 {
@@ -46,25 +55,7 @@ while (true)
         break;
     }
 
-    history.AddUserMessage(userInput);
+    var response = await agent.ChatAsync(userInput);
 
-    Console.Write("Assistant > ");
-
-    var response = string.Empty;
-
-    await foreach (var chunk in chatCompletionService.GetStreamingChatMessageContentsAsync(
-        chatHistory: history,
-        executionSettings: executionSettings,
-        kernel: kernel))
-    {
-        Console.Write(chunk.Content);
-        response += chunk.Content;
-    }
-
-    Console.WriteLine();
-
-    if (!string.IsNullOrWhiteSpace(response))
-    {
-        history.AddAssistantMessage(response);
-    }
+    Console.WriteLine($"Assistant > {response}");
 }
