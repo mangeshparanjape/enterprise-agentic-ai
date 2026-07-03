@@ -9,3 +9,31 @@ Program.cs
  → OllamaProvider / GeminiProvider
  → Semantic Kernel
  → AzureAlertPlugin
+
+## Sequence
+
+Console
+   │
+   ▼
+OperationsAgent
+   │
+   ▼
+AiRequestOrchestrator
+   │
+   ▼
+IAiProviderFactory
+   │
+   ▼
+IAiProvider
+   │
+   ▼
+IAiKernelFactory
+   │
+   ▼
+Semantic Kernel
+   │
+   ▼
+Plugins
+   │
+   ▼
+Business Services
