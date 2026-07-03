@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
+namespace EnterpriseAiPortfolio.Plugins;
 
 public sealed class AzureAlertPlugin
 {

@@ -1,43 +1,40 @@
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+using EnterpriseAiPortfolio.Orchestration;
+
+namespace EnterpriseAiPortfolio.Agents;
 
 public sealed class OperationsAgent : IOperationsAgent
 {
-    private readonly Kernel _kernel;
-    private readonly IChatCompletionService _chatCompletionService;
-    private readonly PromptExecutionSettings _executionSettings;
-    private readonly ChatHistory _history = new();
+    private readonly IAiRequestOrchestrator _orchestrator;
 
-    public OperationsAgent(
-        Kernel kernel,
-        IAiProvider aiProvider)
+    public OperationsAgent(IAiRequestOrchestrator orchestrator)
     {
-        _kernel = kernel;
-        _chatCompletionService =
-            kernel.GetRequiredService<IChatCompletionService>();
-
-        _executionSettings = aiProvider.CreateExecutionSettings();
+        _orchestrator = orchestrator;
     }
 
-    public async Task<string> ChatAsync(string message)
+    public async Task<string> ChatAsync(
+        string userMessage,
+        CancellationToken cancellationToken = default)
     {
-        _history.AddUserMessage(message);
-
-        var response = string.Empty;
-
-        await foreach (var chunk in _chatCompletionService.GetStreamingChatMessageContentsAsync(
-            chatHistory: _history,
-            executionSettings: _executionSettings,
-            kernel: _kernel))
+        var request = new AiRequestContext
         {
-            response += chunk.Content;
+            UserMessage = userMessage,
+            AgentName = nameof(OperationsAgent),
+            SystemMessage = """
+                You are an enterprise operations assistant.
+                Use available plugins whenever appropriate to answer questions accurately.
+                """
+        };
+
+        var result = await _orchestrator.ExecuteAsync(
+            request,
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                $"AI request failed. Provider: {result.ProviderName}. Error: {result.ErrorMessage}");
         }
 
-        if (!string.IsNullOrWhiteSpace(response))
-        {
-            _history.AddAssistantMessage(response);
-        }
-
-        return response;
+        return result.Response;
     }
 }

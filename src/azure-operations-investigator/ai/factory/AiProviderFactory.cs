@@ -1,21 +1,34 @@
 using Microsoft.Extensions.Configuration;
 
-public static class AiProviderFactory
+namespace EnterpriseAiPortfolio.Ai;
+
+public sealed class AiProviderFactory : IAiProviderFactory
 {
-    public static IAiProvider Create(
-        IConfiguration configuration)
+    private readonly IConfiguration _configuration;
+    private readonly OllamaProvider _ollamaProvider;
+    private readonly GeminiProvider _geminiProvider;
+
+    public AiProviderFactory(
+        IConfiguration configuration,
+        OllamaProvider ollamaProvider,
+        GeminiProvider geminiProvider)
     {
-        var provider =
-            configuration["AI:Provider"];
+        _configuration = configuration;
+        _ollamaProvider = ollamaProvider;
+        _geminiProvider = geminiProvider;
+    }
 
-        return provider switch
+    public IAiProvider CreateProvider()
+    {
+        var provider = _configuration["Ai:Provider"];
+
+        return provider?.ToLowerInvariant() switch
         {
-            "Gemini" => new GeminiProvider(),
-
-            "Ollama" => new OllamaProvider(),
+            "ollama" => _ollamaProvider,
+            "gemini" => _geminiProvider,
 
             _ => throw new InvalidOperationException(
-                $"Unknown provider {provider}")
+                $"Unknown AI provider '{provider}'.")
         };
     }
 }

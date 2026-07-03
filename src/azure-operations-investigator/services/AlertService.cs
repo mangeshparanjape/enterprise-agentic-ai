@@ -1,4 +1,4 @@
-
+namespace EnterpriseAiPortfolio.Services;
 public sealed class MockAlertService : IAlertService
 {
     public Task<IReadOnlyList<AlertSummary>> GetActiveAlertsAsync()

@@ -1,8 +1,14 @@
 using Microsoft.SemanticKernel;
 
+namespace EnterpriseAiPortfolio.Ai;
+
 public interface IAiProvider
 {
-    void Configure(IKernelBuilder builder);
+    string Name { get; }
 
-    PromptExecutionSettings CreateExecutionSettings();
+    void ConfigureKernel(IKernelBuilder kernelBuilder);
+
+    Task<AiProviderResponse> ExecuteAsync(
+        AiProviderRequest request,
+        CancellationToken cancellationToken = default);
 }

@@ -1,8 +1,11 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using EnterpriseAiPortfolio.Agents;
+using EnterpriseAiPortfolio.Ai;
+using EnterpriseAiPortfolio.Orchestration;
+using EnterpriseAiPortfolio.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
+using Microsoft.Extensions.Options;
 
 #pragma warning disable SKEXP0070
 
@@ -12,31 +15,33 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
+// Options
+builder.Services
+    .AddOptions<OllamaOptions>()
+    .Bind(builder.Configuration.GetSection(OllamaOptions.SectionName))
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<GeminiOptions>()
+    .Bind(builder.Configuration.GetSection(GeminiOptions.SectionName))
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>();
+builder.Services.AddSingleton<IValidateOptions<GeminiOptions>, GeminiOptionsValidator>();
+
 // App services
 builder.Services.AddSingleton<IAlertService, MockAlertService>();
 
-// AI provider
-builder.Services.AddSingleton<IAiProvider>(sp =>
-{
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    return AiProviderFactory.Create(configuration);
-});
+// AI providers
+builder.Services.AddSingleton<OllamaProvider>();
+builder.Services.AddSingleton<GeminiProvider>();
+builder.Services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
 
-// Build Kernel through DI
-builder.Services.AddSingleton<Kernel>(sp =>
-{
-    var kernelBuilder = Kernel.CreateBuilder();
+// Kernel factory
+builder.Services.AddSingleton<IAiKernelFactory, AiKernelFactory>();
 
-    var aiProvider = sp.GetRequiredService<IAiProvider>();
-
-    aiProvider.Configure(kernelBuilder);
-
-    kernelBuilder.Services.AddSingleton(sp.GetRequiredService<IAlertService>());
-
-    kernelBuilder.Plugins.AddFromType<AzureAlertPlugin>("azure_alerts");
-
-    return kernelBuilder.Build();
-});
+// Orchestration
+builder.Services.AddSingleton<IAiRequestOrchestrator, AiRequestOrchestrator>();
 
 // Agent
 builder.Services.AddSingleton<IOperationsAgent, OperationsAgent>();

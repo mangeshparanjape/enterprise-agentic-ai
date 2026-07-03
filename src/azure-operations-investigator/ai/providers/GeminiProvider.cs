@@ -1,21 +1,64 @@
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Connectors.Google;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace EnterpriseAiPortfolio.Ai;
+
+#pragma warning disable SKEXP0070
 
 public sealed class GeminiProvider : IAiProvider
 {
-    public void Configure(IKernelBuilder builder)
+    private readonly GeminiOptions _options;
+    private readonly IAiKernelFactory _kernelFactory;
+
+    public GeminiProvider(
+        IOptions<GeminiOptions> options,
+        IAiKernelFactory kernelFactory)
     {
-        builder.AddGoogleAIGeminiChatCompletion(
-            modelId: "...",
-            apiKey: "...",
-            apiVersion: GoogleAIVersion.V1_Beta);
+        _options = options.Value;
+        _kernelFactory = kernelFactory;
     }
 
-    public PromptExecutionSettings CreateExecutionSettings()
+    public string Name => "Gemini";
+
+    public void ConfigureKernel(IKernelBuilder kernelBuilder)
     {
-        return new GeminiPromptExecutionSettings
+        kernelBuilder.AddGoogleAIGeminiChatCompletion(
+            modelId: _options.ModelId,
+            apiKey: _options.ApiKey);
+    }
+
+    public async Task<AiProviderResponse> ExecuteAsync(
+        AiProviderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var kernel = _kernelFactory.CreateKernel(this);
+
+        var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+
+        var chatHistory = new ChatHistory();
+
+        if (!string.IsNullOrWhiteSpace(request.SystemMessage))
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+            chatHistory.AddSystemMessage(request.SystemMessage);
+        }
+
+        chatHistory.AddUserMessage(request.UserMessage);
+
+        var response = await chatCompletionService.GetChatMessageContentAsync(
+            chatHistory,
+            kernel: kernel,
+            cancellationToken: cancellationToken);
+
+        return new AiProviderResponse
+        {
+            Content = response.Content ?? string.Empty,
+            ProviderName = Name,
+            Success = true,
+            Metadata =
+            {
+                ["agentName"] = request.AgentName ?? "unknown"
+            }
         };
     }
 }
