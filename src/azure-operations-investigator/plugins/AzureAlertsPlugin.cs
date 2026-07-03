@@ -12,7 +12,7 @@ public sealed class AzureAlertPlugin
 
     [KernelFunction]
     [Description("Gets read-only Azure alert details, affected resource, severity, signal, and recommended investigation steps.")]
-    public Task<string> GetAlertDetailsAsync(
+    public Task<AlertDetails> GetAlertDetailsAsync(
         [Description("Azure alert identifier, for example A123.")]
         string alertId)
     {

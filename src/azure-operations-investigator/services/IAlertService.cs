@@ -1,4 +1,4 @@
 public interface IAlertService
 {
-    Task<string> GetAlertDetailsAsync(string alertId);
+    Task<AlertDetails> GetAlertDetailsAsync(string alertId);
 }
