@@ -28,3 +28,4 @@ coverage.cobertura.xml
 *.log
 *.tmp
 *.temp
+src/azure-operations-investigator/CLAUDE.md
