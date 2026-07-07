@@ -8,6 +8,8 @@ public sealed class AiExecutionResult
     public string CorrelationId { get; init; } = string.Empty;
 
 
+    public string CorrelationId { get; init; } = string.Empty;
+
     public bool Success { get; init; }
 
     public string? ErrorMessage { get; init; }
