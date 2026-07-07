@@ -33,12 +33,17 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
             provider.Name,
             context.AgentName);
 
+        var metadata = new Dictionary<string, object>(context.Metadata)
+        {
+            ["CorrelationId"] = context.CorrelationId
+        };
+
         var providerRequest = new AiProviderRequest
         {
             UserMessage = context.UserMessage,
             SystemMessage = context.SystemMessage,
             AgentName = context.AgentName,
-            Metadata = new Dictionary<string, object>(context.Metadata)
+            Metadata = metadata
         };
 
         try
