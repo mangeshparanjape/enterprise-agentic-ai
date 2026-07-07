@@ -61,6 +61,7 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
             {
                 Response = providerResponse.Content,
                 ProviderName = providerResponse.ProviderName,
+                CorrelationId = context.CorrelationId,
                 Success = providerResponse.Success,
                 ErrorMessage = providerResponse.ErrorMessage,
                 Metadata = new Dictionary<string, object>(providerResponse.Metadata)
@@ -81,6 +82,7 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
             {
                 Response = string.Empty,
                 ProviderName = provider.Name,
+                CorrelationId = context.CorrelationId,
                 Success = false,
                 ErrorMessage = ex.Message
             };
