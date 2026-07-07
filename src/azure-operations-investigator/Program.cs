@@ -40,6 +40,9 @@ builder.Services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
 // Kernel factory
 builder.Services.AddSingleton<IAiKernelFactory, AiKernelFactory>();
 
+// Runtime
+builder.Services.AddSingleton<IAiRuntime, SemanticKernelRuntime>();
+
 // Orchestration
 builder.Services.AddSingleton<IAiRequestOrchestrator, AiRequestOrchestrator>();
 

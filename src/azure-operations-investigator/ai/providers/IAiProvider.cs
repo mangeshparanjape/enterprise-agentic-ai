@@ -8,7 +8,4 @@ public interface IAiProvider
 
     void ConfigureKernel(IKernelBuilder kernelBuilder);
 
-    Task<AiProviderResponse> ExecuteAsync(
-        AiProviderRequest request,
-        CancellationToken cancellationToken = default);
 }

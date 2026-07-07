@@ -5,10 +5,14 @@ namespace EnterpriseAiPortfolio.Orchestration;
 public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
 {
     private readonly IAiProviderFactory _providerFactory;
+    private readonly IAiRuntime _runtime;
 
-    public AiRequestOrchestrator(IAiProviderFactory providerFactory)
+    public AiRequestOrchestrator(
+        IAiProviderFactory providerFactory,
+        IAiRuntime runtime)
     {
         _providerFactory = providerFactory;
+        _runtime = runtime;
     }
 
     public async Task<AiExecutionResult> ExecuteAsync(
@@ -27,7 +31,8 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
 
         try
         {
-            var providerResponse = await provider.ExecuteAsync(
+            var providerResponse = await _runtime.ExecuteAsync(
+                provider,
                 providerRequest,
                 cancellationToken);
 
