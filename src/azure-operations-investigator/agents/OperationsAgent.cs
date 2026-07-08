@@ -1,3 +1,4 @@
+using EnterpriseAiPortfolio.Ai;
 using EnterpriseAiPortfolio.Orchestration;
 
 namespace EnterpriseAiPortfolio.Agents;
@@ -5,6 +6,7 @@ namespace EnterpriseAiPortfolio.Agents;
 public sealed class OperationsAgent : IOperationsAgent
 {
     private readonly IAiRequestOrchestrator _orchestrator;
+    private readonly List<AiConversationMessage> _conversationHistory = [];
 
     public OperationsAgent(IAiRequestOrchestrator orchestrator)
     {
@@ -22,7 +24,8 @@ public sealed class OperationsAgent : IOperationsAgent
             SystemMessage = """
                 You are an enterprise operations assistant.
                 Use available plugins whenever appropriate to answer questions accurately.
-                """
+                """,
+            ConversationHistory = _conversationHistory.AsReadOnly()
         };
 
         var result = await _orchestrator.ExecuteAsync(
@@ -34,6 +37,9 @@ public sealed class OperationsAgent : IOperationsAgent
             throw new InvalidOperationException(
                 $"AI request failed. Provider: {result.ProviderName}. Error: {result.ErrorMessage}");
         }
+
+        _conversationHistory.Add(AiConversationMessage.User(userMessage));
+        _conversationHistory.Add(AiConversationMessage.Assistant(result.Response));
 
         return result.Response;
     }
