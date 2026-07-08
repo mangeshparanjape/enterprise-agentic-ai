@@ -9,6 +9,8 @@ Current architecture:
 - IAiProvider abstraction
 - IAiProviderFactory
 - IAiKernelFactory
+- IAiRuntime
+- SemanticKernelRuntime
 - OllamaProvider
 - GeminiProvider
 - OperationsAgent
@@ -25,6 +27,7 @@ Current architecture:
   - AiExecutionResult
   - AiProviderRequest
   - AiProviderResponse
+  - AiConversationMessage
 
 Current execution flow:
 
@@ -33,6 +36,8 @@ Program.cs
 → AiRequestOrchestrator
 → IAiProviderFactory
 → IAiProvider
+→ IAiRuntime
+→ SemanticKernelRuntime
 → IAiKernelFactory
 → Semantic Kernel
 → Plugins
@@ -54,4 +59,29 @@ Guiding principles:
 - Don't skip steps or assume code.
 - Challenge the architecture if something can be designed better.
 
-Our next goal is to review the current architecture, identify the highest-value improvements, prioritize them, and then implement them incrementally.
+## Recent feature: Conversation history
+
+The OperationsAgent now maintains in-memory conversation history and passes it through the orchestration layer into the AI runtime.
+
+This matters because an operations assistant should support follow-up questions such as:
+
+- "Show me the active alerts."
+- "Now explain the critical one."
+- "What would you check next?"
+
+Before this change, every request created a fresh runtime chat history. The application had clean orchestration, but the assistant could not reason across turns.
+
+The implementation keeps Semantic Kernel isolated inside `SemanticKernelRuntime`. The application-level request model uses `AiConversationMessage` instead of exposing Semantic Kernel chat types outside the runtime boundary.
+
+Design decision:
+
+- `OperationsAgent` owns short-lived in-memory conversation state.
+- `AiRequestContext` carries application-level history.
+- `AiProviderRequest` carries provider/runtime-level history.
+- `SemanticKernelRuntime` translates application messages into Semantic Kernel `ChatHistory`.
+
+This preserves the AI runtime abstraction while adding useful multi-turn behavior.
+
+Next likely improvement:
+
+Add a bounded history policy so the agent does not keep unlimited messages in memory. After that, we can introduce a durable memory abstraction or a mocked KQL plugin.
