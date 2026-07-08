@@ -32,6 +32,11 @@ public sealed class SemanticKernelRuntime : IAiRuntime
             chatHistory.AddSystemMessage(request.SystemMessage);
         }
 
+        foreach (var message in request.ConversationHistory)
+        {
+            AddConversationMessage(chatHistory, message);
+        }
+
         chatHistory.AddUserMessage(request.UserMessage);
 
         PromptExecutionSettings executionSettings = provider.Name.ToLowerInvariant() switch
@@ -63,8 +68,34 @@ public sealed class SemanticKernelRuntime : IAiRuntime
             Success = true,
             Metadata =
             {
-                ["agentName"] = request.AgentName ?? "unknown"
+                ["agentName"] = request.AgentName ?? "unknown",
+                ["historyMessageCount"] = request.ConversationHistory.Count
             }
         };
+    }
+
+    private static void AddConversationMessage(
+        ChatHistory chatHistory,
+        AiConversationMessage message)
+    {
+        if (string.IsNullOrWhiteSpace(message.Content))
+        {
+            return;
+        }
+
+        switch (message.Role.ToLowerInvariant())
+        {
+            case "user":
+                chatHistory.AddUserMessage(message.Content);
+                break;
+
+            case "assistant":
+                chatHistory.AddAssistantMessage(message.Content);
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported conversation role '{message.Role}'.");
+        }
     }
 }
