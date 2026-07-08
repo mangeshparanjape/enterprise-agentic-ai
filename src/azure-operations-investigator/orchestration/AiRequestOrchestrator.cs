@@ -28,10 +28,11 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
         var provider = _providerFactory.CreateProvider();
 
         _logger.LogInformation(
-            "AI request execution started. CorrelationId={CorrelationId}, Provider={ProviderName}, Agent={AgentName}",
+            "AI request execution started. CorrelationId={CorrelationId}, Provider={ProviderName}, Agent={AgentName}, HistoryMessageCount={HistoryMessageCount}",
             context.CorrelationId,
             provider.Name,
-            context.AgentName);
+            context.AgentName,
+            context.ConversationHistory.Count);
 
         var metadata = new Dictionary<string, object>(context.Metadata)
         {
@@ -43,6 +44,7 @@ public sealed class AiRequestOrchestrator : IAiRequestOrchestrator
             UserMessage = context.UserMessage,
             SystemMessage = context.SystemMessage,
             AgentName = context.AgentName,
+            ConversationHistory = context.ConversationHistory,
             Metadata = metadata
         };
 
