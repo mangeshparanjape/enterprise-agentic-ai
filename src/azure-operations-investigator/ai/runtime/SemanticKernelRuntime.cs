@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Google;
@@ -10,10 +12,14 @@ namespace EnterpriseAiPortfolio.Ai;
 public sealed class SemanticKernelRuntime : IAiRuntime
 {
     private readonly IAiKernelFactory _kernelFactory;
+    private readonly ILogger<SemanticKernelRuntime> _logger;
 
-    public SemanticKernelRuntime(IAiKernelFactory kernelFactory)
+    public SemanticKernelRuntime(
+        IAiKernelFactory kernelFactory,
+        ILogger<SemanticKernelRuntime> logger)
     {
         _kernelFactory = kernelFactory;
+        _logger = logger;
     }
 
     public async Task<AiProviderResponse> ExecuteAsync(
@@ -21,57 +27,103 @@ public sealed class SemanticKernelRuntime : IAiRuntime
         AiProviderRequest request,
         CancellationToken cancellationToken = default)
     {
-        var kernel = _kernelFactory.CreateKernel(provider);
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(request);
 
-        var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+        var stopwatch = Stopwatch.StartNew();
 
-        var chatHistory = new ChatHistory();
+        _logger.LogInformation(
+            "AI execution started for agent {AgentName} using provider {ProviderName} with {HistoryMessageCount} history messages",
+            request.AgentName ?? "unknown",
+            provider.Name,
+            request.ConversationHistory.Count);
 
-        if (!string.IsNullOrWhiteSpace(request.SystemMessage))
+        try
         {
-            chatHistory.AddSystemMessage(request.SystemMessage);
-        }
+            var kernel = _kernelFactory.CreateKernel(provider);
+            var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+            var chatHistory = new ChatHistory();
 
-        foreach (var message in request.ConversationHistory)
-        {
-            AddConversationMessage(chatHistory, message);
-        }
-
-        chatHistory.AddUserMessage(request.UserMessage);
-
-        PromptExecutionSettings executionSettings = provider.Name.ToLowerInvariant() switch
-        {
-            "gemini" => new GeminiPromptExecutionSettings
+            if (!string.IsNullOrWhiteSpace(request.SystemMessage))
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-            },
-
-            "ollama" => new OllamaPromptExecutionSettings
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-            },
-
-            _ => throw new InvalidOperationException(
-                $"Unsupported provider '{provider.Name}' for Semantic Kernel runtime.")
-        };
-
-        var response = await chatCompletionService.GetChatMessageContentAsync(
-            chatHistory,
-            executionSettings,
-            kernel: kernel,
-            cancellationToken: cancellationToken);
-
-        return new AiProviderResponse
-        {
-            Content = response.Content ?? string.Empty,
-            ProviderName = provider.Name,
-            Success = true,
-            Metadata =
-            {
-                ["agentName"] = request.AgentName ?? "unknown",
-                ["historyMessageCount"] = request.ConversationHistory.Count
+                chatHistory.AddSystemMessage(request.SystemMessage);
             }
-        };
+
+            foreach (var message in request.ConversationHistory)
+            {
+                AddConversationMessage(chatHistory, message);
+            }
+
+            chatHistory.AddUserMessage(request.UserMessage);
+
+            PromptExecutionSettings executionSettings = provider.Name.ToLowerInvariant() switch
+            {
+                "gemini" => new GeminiPromptExecutionSettings
+                {
+                    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+                },
+
+                "ollama" => new OllamaPromptExecutionSettings
+                {
+                    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+                },
+
+                _ => throw new InvalidOperationException(
+                    $"Unsupported provider '{provider.Name}' for Semantic Kernel runtime.")
+            };
+
+            var response = await chatCompletionService.GetChatMessageContentAsync(
+                chatHistory,
+                executionSettings,
+                kernel: kernel,
+                cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+
+            _logger.LogInformation(
+                "AI execution completed for agent {AgentName} using provider {ProviderName} in {ElapsedMilliseconds} ms",
+                request.AgentName ?? "unknown",
+                provider.Name,
+                stopwatch.ElapsedMilliseconds);
+
+            return new AiProviderResponse
+            {
+                Content = response.Content ?? string.Empty,
+                ProviderName = provider.Name,
+                Success = true,
+                Metadata =
+                {
+                    ["agentName"] = request.AgentName ?? "unknown",
+                    ["historyMessageCount"] = request.ConversationHistory.Count,
+                    ["elapsedMilliseconds"] = stopwatch.ElapsedMilliseconds
+                }
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+
+            _logger.LogWarning(
+                "AI execution was cancelled for agent {AgentName} using provider {ProviderName} after {ElapsedMilliseconds} ms",
+                request.AgentName ?? "unknown",
+                provider.Name,
+                stopwatch.ElapsedMilliseconds);
+
+            throw;
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+
+            _logger.LogError(
+                exception,
+                "AI execution failed for agent {AgentName} using provider {ProviderName} after {ElapsedMilliseconds} ms",
+                request.AgentName ?? "unknown",
+                provider.Name,
+                stopwatch.ElapsedMilliseconds);
+
+            throw;
+        }
     }
 
     private static void AddConversationMessage(
