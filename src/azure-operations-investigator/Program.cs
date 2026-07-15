@@ -13,7 +13,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
-builder.Logging.SetMinimumLevel(LogLevel.Warning);
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // Options
 builder.Services
