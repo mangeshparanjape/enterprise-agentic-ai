@@ -1,16 +1,21 @@
 using EnterpriseAiPortfolio.Ai;
 using EnterpriseAiPortfolio.Orchestration;
+using Microsoft.Extensions.Options;
 
 namespace EnterpriseAiPortfolio.Agents;
 
 public sealed class OperationsAgent : IOperationsAgent
 {
     private readonly IAiRequestOrchestrator _orchestrator;
+    private readonly OperationsAgentOptions _options;
     private readonly List<AiConversationMessage> _conversationHistory = [];
 
-    public OperationsAgent(IAiRequestOrchestrator orchestrator)
+    public OperationsAgent(
+        IAiRequestOrchestrator orchestrator,
+        IOptions<OperationsAgentOptions> options)
     {
         _orchestrator = orchestrator;
+        _options = options.Value;
     }
 
     public async Task<string> ChatAsync(
@@ -41,6 +46,19 @@ public sealed class OperationsAgent : IOperationsAgent
         _conversationHistory.Add(AiConversationMessage.User(userMessage));
         _conversationHistory.Add(AiConversationMessage.Assistant(result.Response));
 
+        TrimConversationHistory();
+
         return result.Response;
+    }
+
+    private void TrimConversationHistory()
+    {
+        var maxHistoryMessages = _options.MaxHistoryTurns * 2;
+        var messagesToRemove = _conversationHistory.Count - maxHistoryMessages;
+
+        if (messagesToRemove > 0)
+        {
+            _conversationHistory.RemoveRange(0, messagesToRemove);
+        }
     }
 }
