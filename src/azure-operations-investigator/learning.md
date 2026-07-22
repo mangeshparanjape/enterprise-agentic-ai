@@ -19,7 +19,7 @@ Current architecture:
 - AzureAlertPlugin
 - IAlertService
 - MockAlertService
-- Strongly typed Options (OllamaOptions, GeminiOptions)
+- Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions)
 - Options Validators (IValidateOptions)
 - Function calling working end-to-end
 - Request/Response contracts:
@@ -61,15 +61,13 @@ Guiding principles:
 
 ## Recent feature: Conversation history
 
-The OperationsAgent now maintains in-memory conversation history and passes it through the orchestration layer into the AI runtime.
+The OperationsAgent maintains in-memory conversation history and passes it through the orchestration layer into the AI runtime.
 
 This matters because an operations assistant should support follow-up questions such as:
 
 - "Show me the active alerts."
 - "Now explain the critical one."
 - "What would you check next?"
-
-Before this change, every request created a fresh runtime chat history. The application had clean orchestration, but the assistant could not reason across turns.
 
 The implementation keeps Semantic Kernel isolated inside `SemanticKernelRuntime`. The application-level request model uses `AiConversationMessage` instead of exposing Semantic Kernel chat types outside the runtime boundary.
 
@@ -80,8 +78,21 @@ Design decision:
 - `AiProviderRequest` carries provider/runtime-level history.
 - `SemanticKernelRuntime` translates application messages into Semantic Kernel `ChatHistory`.
 
-This preserves the AI runtime abstraction while adding useful multi-turn behavior.
+## Recent feature: Bounded conversation history
+
+Conversation history is now limited by the configurable `Agent:Operations:MaxHistoryTurns` setting. A turn consists of one user message and one assistant response.
+
+After each successful response, `OperationsAgent` removes the oldest completed turns when the configured limit is exceeded. The default is ten turns.
+
+Why this matters:
+
+- Prevents unbounded in-memory growth.
+- Reduces the amount of historical context sent to the model.
+- Helps control latency and token consumption as conversations grow.
+- Keeps the policy configurable without coupling it to Semantic Kernel.
+
+Setting `MaxHistoryTurns` to zero makes each request stateless while preserving the same agent implementation.
 
 Next likely improvement:
 
-Add a bounded history policy so the agent does not keep unlimited messages in memory. After that, we can introduce a durable memory abstraction or a mocked KQL plugin.
+Introduce a mocked KQL plugin so the agent can combine alert retrieval with operational log analysis.
