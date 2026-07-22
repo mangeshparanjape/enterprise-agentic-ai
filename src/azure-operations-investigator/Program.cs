@@ -30,8 +30,8 @@ builder.Services
     .AddOptions<OperationsAgentOptions>()
     .Bind(builder.Configuration.GetSection(OperationsAgentOptions.SectionName))
     .Validate(
-        options => options.MaxHistoryMessages >= 0,
-        "Agent:Operations:MaxHistoryMessages must be zero or greater.")
+        options => options.MaxHistoryTurns >= 0,
+        "Agent:Operations:MaxHistoryTurns must be zero or greater.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>();
