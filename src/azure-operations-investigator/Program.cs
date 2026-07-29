@@ -39,6 +39,7 @@ builder.Services.AddSingleton<IValidateOptions<GeminiOptions>, GeminiOptionsVali
 
 // App services
 builder.Services.AddSingleton<IAlertService, MockAlertService>();
+builder.Services.AddSingleton<IKqlQueryService, MockKqlQueryService>();
 
 // AI providers
 builder.Services.AddSingleton<OllamaProvider>();
