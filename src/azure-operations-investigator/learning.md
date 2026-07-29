@@ -17,8 +17,11 @@ Current architecture:
 - IAiRequestOrchestrator
 - AiRequestOrchestrator
 - AzureAlertPlugin
+- KqlInvestigationPlugin
 - IAlertService
 - MockAlertService
+- IKqlQueryService
+- MockKqlQueryService
 - Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions)
 - Options Validators (IValidateOptions)
 - Function calling working end-to-end
@@ -93,6 +96,30 @@ Why this matters:
 
 Setting `MaxHistoryTurns` to zero makes each request stateless while preserving the same agent implementation.
 
+## Recent feature: Mocked KQL investigation plugin
+
+The agent can now perform a read-only operational log investigation after retrieving an Azure alert. `KqlInvestigationPlugin` exposes a semantically described function to the model while `IKqlQueryService` owns the log-analysis capability.
+
+The initial implementation uses `MockKqlQueryService`, which returns:
+
+- A generated read-only KQL query scoped to a resource and lookback period.
+- Representative operational findings with timestamps, severity, operation, message, and correlation ID.
+- A concise diagnosis that the agent can combine with alert details.
+
+Design decisions:
+
+- The plugin accepts an investigation goal instead of arbitrary KQL from the model.
+- The service generates the query, preserving a controlled read-only boundary.
+- Lookback is constrained to 5 minutes through 24 hours.
+- The service abstraction can later be replaced by an Azure Monitor or Log Analytics implementation without changing the plugin or agent.
+- Cancellation is propagated through the plugin and service contract.
+
+Example prompt:
+
+"Investigate alert A123 and use recent logs to explain the likely cause."
+
+Semantic Kernel can first call `azure_alerts.GetAlertDetailsAsync` and then call `kql_investigation.InvestigateResourceLogsAsync` using the affected resource from the alert.
+
 Next likely improvement:
 
-Introduce a mocked KQL plugin so the agent can combine alert retrieval with operational log analysis.
+Add automated tests for plugin metadata, input validation, and the alert-to-log investigation workflow.
