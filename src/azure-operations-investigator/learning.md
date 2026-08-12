@@ -18,10 +18,14 @@ Current architecture:
 - AiRequestOrchestrator
 - AzureAlertPlugin
 - KqlInvestigationPlugin
+- RunbookSearchPlugin
 - IAlertService
 - MockAlertService
 - IKqlQueryService
 - MockKqlQueryService
+- IRunbookSearchService
+- MockRunbookSearchService
+- ToolInvocationAuditFilter
 - Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions)
 - Options Validators (IValidateOptions)
 - Function calling working end-to-end
@@ -43,6 +47,7 @@ Program.cs
 → SemanticKernelRuntime
 → IAiKernelFactory
 → Semantic Kernel
+→ Function invocation filters
 → Plugins
 → Business Services
 
@@ -120,6 +125,28 @@ Example prompt:
 
 Semantic Kernel can first call `azure_alerts.GetAlertDetailsAsync` and then call `kql_investigation.InvestigateResourceLogsAsync` using the affected resource from the alert.
 
+## Recent feature: Tool invocation audit filter
+
+Every Semantic Kernel function invocation now passes through `ToolInvocationAuditFilter`, an `IFunctionInvocationFilter` registered at the kernel boundary.
+
+The filter records:
+
+- Plugin and function name when execution starts.
+- Successful completion and elapsed milliseconds.
+- Exceptions, plugin/function identity, and elapsed milliseconds when execution fails.
+
+Design decisions:
+
+- Auditing is centralized instead of duplicated inside every plugin.
+- Plugin arguments and results are intentionally not logged, reducing the risk of leaking sensitive operational data or PII.
+- The filter uses the Generic Host `ILoggerFactory`, so tool telemetry follows the application's normal logging providers and configuration.
+- Exceptions are logged and rethrown so the filter does not change business behavior.
+- Registering the filter after the kernel is built makes filter ordering explicit for future authorization, redaction, or approval filters.
+
+Why this matters:
+
+Function calling lets the model choose application capabilities. Enterprise systems need an application-controlled interception point around those calls for observability and, later, policy enforcement. Semantic Kernel filters provide that boundary without coupling governance logic to individual tools.
+
 Next likely improvement:
 
-Add automated tests for plugin metadata, input validation, and the alert-to-log investigation workflow.
+Add an authorization or approval filter before introducing any state-changing operations tool.
