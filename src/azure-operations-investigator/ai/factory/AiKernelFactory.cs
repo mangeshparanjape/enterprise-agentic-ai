@@ -2,6 +2,7 @@ using EnterpriseAiPortfolio.Ai.Filters;
 using EnterpriseAiPortfolio.Plugins;
 using EnterpriseAiPortfolio.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,17 +13,20 @@ public sealed class AiKernelFactory : IAiKernelFactory
     private readonly IAlertService _alertService;
     private readonly IKqlQueryService _kqlQueryService;
     private readonly IRunbookSearchService _runbookSearchService;
+    private readonly IOptions<ToolAuthorizationOptions> _toolAuthorizationOptions;
     private readonly ILoggerFactory _loggerFactory;
 
     public AiKernelFactory(
         IAlertService alertService,
         IKqlQueryService kqlQueryService,
         IRunbookSearchService runbookSearchService,
+        IOptions<ToolAuthorizationOptions> toolAuthorizationOptions,
         ILoggerFactory loggerFactory)
     {
         _alertService = alertService;
         _kqlQueryService = kqlQueryService;
         _runbookSearchService = runbookSearchService;
+        _toolAuthorizationOptions = toolAuthorizationOptions;
         _loggerFactory = loggerFactory;
     }
 
@@ -41,9 +45,15 @@ public sealed class AiKernelFactory : IAiKernelFactory
         kernelBuilder.Plugins.AddFromType<RunbookSearchPlugin>("runbook_search");
 
         var kernel = kernelBuilder.Build();
+
+        // Audit wraps authorization so denied attempts are logged as failed invocations.
         kernel.FunctionInvocationFilters.Add(
             new ToolInvocationAuditFilter(
                 _loggerFactory.CreateLogger<ToolInvocationAuditFilter>()));
+        kernel.FunctionInvocationFilters.Add(
+            new ToolAuthorizationFilter(
+                _toolAuthorizationOptions,
+                _loggerFactory.CreateLogger<ToolAuthorizationFilter>()));
 
         return kernel;
     }
