@@ -34,6 +34,17 @@ builder.Services
         "Agent:Operations:MaxHistoryTurns must be zero or greater.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<ToolAuthorizationOptions>()
+    .Bind(builder.Configuration.GetSection(ToolAuthorizationOptions.SectionName))
+    .Validate(
+        options => options.AllowedPlugins.Length > 0,
+        "Ai:ToolAuthorization:AllowedPlugins must contain at least one plugin.")
+    .Validate(
+        options => options.AllowedPlugins.All(plugin => !string.IsNullOrWhiteSpace(plugin)),
+        "Ai:ToolAuthorization:AllowedPlugins cannot contain blank plugin names.")
+    .ValidateOnStart();
+
 builder.Services.AddSingleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<GeminiOptions>, GeminiOptionsValidator>();
 
