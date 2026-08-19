@@ -26,7 +26,8 @@ Current architecture:
 - IRunbookSearchService
 - MockRunbookSearchService
 - ToolInvocationAuditFilter
-- Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions)
+- ToolAuthorizationFilter
+- Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions, ToolAuthorizationOptions)
 - Options Validators (IValidateOptions)
 - Function calling working end-to-end
 - Request/Response contracts:
@@ -147,6 +148,31 @@ Why this matters:
 
 Function calling lets the model choose application capabilities. Enterprise systems need an application-controlled interception point around those calls for observability and, later, policy enforcement. Semantic Kernel filters provide that boundary without coupling governance logic to individual tools.
 
+## Recent feature: Deny-by-default tool authorization
+
+`ToolAuthorizationFilter` now enforces an application-controlled allowlist before a Semantic Kernel plugin function can execute.
+
+Approved plugin names are configured under `Ai:ToolAuthorization:AllowedPlugins`. The current read-only plugins are explicitly allowed:
+
+- `azure_alerts`
+- `kql_investigation`
+- `runbook_search`
+
+Any plugin that is registered later but not explicitly added to the allowlist is blocked with `UnauthorizedAccessException`.
+
+Design decisions:
+
+- Authorization is enforced in code, not through system-prompt instructions.
+- The policy is deny-by-default so adding a new plugin does not automatically grant the model execution rights.
+- Configuration is validated at startup to prevent an accidentally empty or malformed policy.
+- The audit filter is registered before the authorization filter so denied invocation attempts are still recorded as failed tool calls.
+- Plugin arguments and results remain outside authorization logs.
+- Future state-changing capabilities should be placed in dedicated action plugins so they can remain denied until an approval/authorization policy is intentionally added.
+
+Why this matters:
+
+Function calling gives the model the ability to select application capabilities, but the application must remain the final authority over what can execute. This establishes a least-privilege boundary before any state-changing operations tools are introduced.
+
 Next likely improvement:
 
-Add an authorization or approval filter before introducing any state-changing operations tool.
+Add a state-changing operations tool behind an explicit human-approval policy, while keeping the current read-only tools automatically executable.
