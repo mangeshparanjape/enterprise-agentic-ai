@@ -19,12 +19,15 @@ Current architecture:
 - AzureAlertPlugin
 - KqlInvestigationPlugin
 - RunbookSearchPlugin
+- AzureOperationsPlugin
 - IAlertService
 - MockAlertService
 - IKqlQueryService
 - MockKqlQueryService
 - IRunbookSearchService
 - MockRunbookSearchService
+- IOperationApprovalService
+- InMemoryOperationApprovalService
 - ToolInvocationAuditFilter
 - ToolAuthorizationFilter
 - Strongly typed Options (OllamaOptions, GeminiOptions, OperationsAgentOptions, ToolAuthorizationOptions)
@@ -152,11 +155,7 @@ Function calling lets the model choose application capabilities. Enterprise syst
 
 `ToolAuthorizationFilter` now enforces an application-controlled allowlist before a Semantic Kernel plugin function can execute.
 
-Approved plugin names are configured under `Ai:ToolAuthorization:AllowedPlugins`. The current read-only plugins are explicitly allowed:
-
-- `azure_alerts`
-- `kql_investigation`
-- `runbook_search`
+Approved plugin names are configured under `Ai:ToolAuthorization:AllowedPlugins`. The approved plugins are explicitly listed rather than implicitly trusted.
 
 Any plugin that is registered later but not explicitly added to the allowlist is blocked with `UnauthorizedAccessException`.
 
@@ -167,12 +166,38 @@ Design decisions:
 - Configuration is validated at startup to prevent an accidentally empty or malformed policy.
 - The audit filter is registered before the authorization filter so denied invocation attempts are still recorded as failed tool calls.
 - Plugin arguments and results remain outside authorization logs.
-- Future state-changing capabilities should be placed in dedicated action plugins so they can remain denied until an approval/authorization policy is intentionally added.
 
 Why this matters:
 
-Function calling gives the model the ability to select application capabilities, but the application must remain the final authority over what can execute. This establishes a least-privilege boundary before any state-changing operations tools are introduced.
+Function calling gives the model the ability to select application capabilities, but the application must remain the final authority over what can execute.
+
+## Recent feature: Human approval for state-changing operations
+
+`AzureOperationsPlugin` introduces the first state-changing operations workflow without giving the model direct execution authority.
+
+The plugin exposes only `RequestRestartAsync`. Calling it creates a pending `OperationApprovalRequest` through `IOperationApprovalService`; it does not restart anything.
+
+A human operator resolves the request through console commands that are deliberately outside the Semantic Kernel tool path:
+
+- `/pending`
+- `/approve <id>`
+- `/reject <id>`
+
+`InMemoryOperationApprovalService` simulates the restart only after `/approve <id>` is entered. Rejected requests are marked rejected and never execute.
+
+Design decisions:
+
+- The model can propose an action but cannot approve its own action.
+- Approval state is owned by application code, not the prompt.
+- The approval identifier binds the human decision to a specific resource, operation, and reason.
+- A resolved approval cannot be reused.
+- The current execution is intentionally simulated; a future Azure SDK implementation can replace it behind the same approval boundary.
+- `azure_operations` is explicitly allowlisted because its exposed capability is proposal-only; direct restart execution is not a Kernel function.
+
+Why this matters:
+
+Authorization answers whether a capability may participate in the application. Human approval answers whether a specific consequential invocation should proceed. Keeping execution outside the model-accessible tool surface prevents the LLM from approving or invoking the protected action itself.
 
 Next likely improvement:
 
-Add a state-changing operations tool behind an explicit human-approval policy, while keeping the current read-only tools automatically executable.
+Persist approval requests and audit records so pending actions survive process restarts and can be reviewed with a durable execution history.
