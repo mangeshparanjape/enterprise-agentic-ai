@@ -52,6 +52,7 @@ builder.Services.AddSingleton<IValidateOptions<GeminiOptions>, GeminiOptionsVali
 builder.Services.AddSingleton<IAlertService, MockAlertService>();
 builder.Services.AddSingleton<IKqlQueryService, MockKqlQueryService>();
 builder.Services.AddSingleton<IRunbookSearchService, MockRunbookSearchService>();
+builder.Services.AddSingleton<IOperationApprovalService, InMemoryOperationApprovalService>();
 
 // AI providers
 builder.Services.AddSingleton<OllamaProvider>();
@@ -73,6 +74,9 @@ builder.Services.AddSingleton<IOperationsAgent, OperationsAgent>();
 using var host = builder.Build();
 
 var agent = host.Services.GetRequiredService<IOperationsAgent>();
+var approvalService = host.Services.GetRequiredService<IOperationApprovalService>();
+
+Console.WriteLine("Commands: /pending, /approve <id>, /reject <id>. Approval commands execute outside the AI tool path.");
 
 while (true)
 {
@@ -84,7 +88,52 @@ while (true)
         break;
     }
 
+    if (string.Equals(userInput, "/pending", StringComparison.OrdinalIgnoreCase))
+    {
+        var pending = approvalService.GetPending();
+        if (pending.Count == 0)
+        {
+            Console.WriteLine("System > No pending operation approvals.");
+            continue;
+        }
+
+        foreach (var request in pending)
+        {
+            Console.WriteLine($"System > {request.Id} | {request.Operation} | {request.ResourceName} | {request.Reason}");
+        }
+
+        continue;
+    }
+
+    if (userInput.StartsWith("/approve ", StringComparison.OrdinalIgnoreCase))
+    {
+        ResolveApproval(userInput[9..], approve: true);
+        continue;
+    }
+
+    if (userInput.StartsWith("/reject ", StringComparison.OrdinalIgnoreCase))
+    {
+        ResolveApproval(userInput[8..], approve: false);
+        continue;
+    }
+
     var response = await agent.ChatAsync(userInput);
 
     Console.WriteLine($"Assistant > {response}");
+}
+
+void ResolveApproval(string approvalId, bool approve)
+{
+    try
+    {
+        var result = approve
+            ? approvalService.ApproveAndExecute(approvalId)
+            : approvalService.Reject(approvalId);
+
+        Console.WriteLine($"System > {result.Status}: {result.Result}");
+    }
+    catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+    {
+        Console.WriteLine($"System > {ex.Message}");
+    }
 }
