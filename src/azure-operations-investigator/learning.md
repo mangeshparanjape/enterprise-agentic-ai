@@ -14,6 +14,8 @@ Current architecture:
 - OllamaProvider
 - GeminiProvider
 - OperationsAgent
+- IConversationHistoryCompactor
+- TokenAwareConversationHistoryCompactor
 - IAiRequestOrchestrator
 - AiRequestOrchestrator
 - AzureAlertPlugin
@@ -198,6 +200,32 @@ Why this matters:
 
 Authorization answers whether a capability may participate in the application. Human approval answers whether a specific consequential invocation should proceed. Keeping execution outside the model-accessible tool surface prevents the LLM from approving or invoking the protected action itself.
 
+## Recent feature: Token-aware conversation compaction
+
+`OperationsAgent` now delegates history management to `IConversationHistoryCompactor` instead of trimming messages itself. The initial implementation, `TokenAwareConversationHistoryCompactor`, uses a token-aware truncation strategy while preserving complete user/assistant turns.
+
+Configuration under `Agent:Operations` now includes:
+
+- `MaxHistoryTurns` — hard cap on retained turns; zero remains stateless mode.
+- `MaxHistoryTokens` — approximate token budget for retained history; zero disables the token budget.
+- `PreserveRecentTurns` — minimum number of most recent complete turns retained while applying the token budget.
+
+The estimator intentionally uses a lightweight approximation of four characters per token plus a small per-message overhead. This avoids coupling the agent layer to any one provider tokenizer while still making context growth visible and controllable.
+
+Design decisions:
+
+- Compaction is an application concern and remains outside Semantic Kernel.
+- The compactor removes only complete user/assistant turn pairs so history is never left structurally half-complete.
+- The hard turn cap is applied first, then the token budget.
+- Recent turns are protected from token-budget truncation to retain local conversational continuity.
+- Compaction logs message counts and estimated token counts, but never message content.
+- Startup validation rejects negative limits and configurations where `PreserveRecentTurns` exceeds `MaxHistoryTurns`.
+- The abstraction allows a future summarization-based compactor or Agent Framework compaction provider to replace this implementation without changing `OperationsAgent`.
+
+Why this matters:
+
+A fixed turn count is a weak proxy for model context usage because one turn can contain a few words while another can contain thousands. A token-aware policy better controls cost, latency, and context-window pressure while keeping the current implementation deterministic and provider-neutral.
+
 Next likely improvement:
 
-Persist approval requests and audit records so pending actions survive process restarts and can be reviewed with a durable execution history.
+Add automated unit tests for the compaction policy, then evolve from truncation to summarization once a stable provider-neutral summarization boundary is defined.
