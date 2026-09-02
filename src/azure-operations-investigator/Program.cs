@@ -32,6 +32,15 @@ builder.Services
     .Validate(
         options => options.MaxHistoryTurns >= 0,
         "Agent:Operations:MaxHistoryTurns must be zero or greater.")
+    .Validate(
+        options => options.MaxHistoryTokens >= 0,
+        "Agent:Operations:MaxHistoryTokens must be zero or greater.")
+    .Validate(
+        options => options.PreserveRecentTurns >= 0,
+        "Agent:Operations:PreserveRecentTurns must be zero or greater.")
+    .Validate(
+        options => options.MaxHistoryTurns == 0 || options.PreserveRecentTurns <= options.MaxHistoryTurns,
+        "Agent:Operations:PreserveRecentTurns cannot exceed MaxHistoryTurns.")
     .ValidateOnStart();
 
 builder.Services
@@ -53,6 +62,7 @@ builder.Services.AddSingleton<IAlertService, MockAlertService>();
 builder.Services.AddSingleton<IKqlQueryService, MockKqlQueryService>();
 builder.Services.AddSingleton<IRunbookSearchService, MockRunbookSearchService>();
 builder.Services.AddSingleton<IOperationApprovalService, InMemoryOperationApprovalService>();
+builder.Services.AddSingleton<IConversationHistoryCompactor, TokenAwareConversationHistoryCompactor>();
 
 // AI providers
 builder.Services.AddSingleton<OllamaProvider>();
